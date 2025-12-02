@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     # Your apps
     'users',
     'emails',
+    'scanner',
 ]
 
 MIDDLEWARE = [
@@ -147,3 +148,17 @@ REST_FRAMEWORK = {
 
 LOGIN_REDIRECT_URL = '/'      # After login, go to home
 LOGOUT_REDIRECT_URL = '/login/'  # After logout, go to login page
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+        }
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": "INFO",
+    },
+}

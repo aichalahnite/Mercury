@@ -24,6 +24,7 @@ urlpatterns = [
     path("users/", include("users.urls")),
     path("emails/", include("emails.urls")),
     path("swagger/", schema_view.with_ui("swagger", cache_timeout=0)),
+    path("scanner/", include("scanner.urls")),
 
     # Login page
     path('login/', auth_views.LoginView.as_view(template_name='registration/login.html'), name='login'),
