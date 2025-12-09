@@ -58,6 +58,11 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+
+    # 🔥 Add our advanced layers:
+    'backend.middleware.security_gateway.SecurityGatewayMiddleware',
+    'backend.middleware.intelligent_router.IntelligentServiceRouterMiddleware',
+    'backend.middleware.response_logger.ResponseLoggingMiddleware',
 ]
 
 ROOT_URLCONF = 'backend.urls'
@@ -161,4 +166,9 @@ LOGGING = {
         "handlers": ["console"],
         "level": "INFO",
     },
+}
+
+LOGGING['loggers']['gateway_logger'] = {
+    "handlers": ["console"],
+    "level": "INFO",
 }
