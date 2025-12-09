@@ -101,7 +101,6 @@ DATABASES = {
 }
 
 
-
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 
@@ -154,6 +153,10 @@ REST_FRAMEWORK = {
 LOGIN_REDIRECT_URL = '/'      # After login, go to home
 LOGOUT_REDIRECT_URL = '/login/'  # After logout, go to login page
 
+
+# -------------------------
+# Logging Configuration
+# -------------------------
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
@@ -166,9 +169,17 @@ LOGGING = {
         "handlers": ["console"],
         "level": "INFO",
     },
+    "loggers": {
+        "gateway_logger": {
+            "handlers": ["console"],
+            "level": "INFO",
+        }
+    },
 }
 
-LOGGING['loggers']['gateway_logger'] = {
+# Ensure we can dynamically add loggers safely
+LOGGING.setdefault("loggers", {})
+LOGGING["loggers"]["gateway_logger"] = {
     "handlers": ["console"],
     "level": "INFO",
 }
