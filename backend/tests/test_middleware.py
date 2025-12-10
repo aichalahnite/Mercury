@@ -1,9 +1,12 @@
 import uuid
+import pytest
 from django.test import RequestFactory
+from django.http import JsonResponse
+from django.contrib.auth.models import AnonymousUser
+
 from middleware.security_gateway import SecurityGatewayMiddleware
 from middleware.intelligent_router import IntelligentServiceRouterMiddleware
 from middleware.response_logger import ResponseLoggingMiddleware
-from django.http import JsonResponse
 
 def get_response(_):
     return JsonResponse({"ok": True})
@@ -29,6 +32,7 @@ def test_router_sets_service_route():
 def test_response_logger_injects_trace():
     request = RequestFactory().get("/")
     request.trace_id = "1234-TEST"
+    request.user = AnonymousUser()  # FIX
 
     mw = ResponseLoggingMiddleware(get_response)
     response = mw(request)

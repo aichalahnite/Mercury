@@ -1,9 +1,10 @@
-from django.urls import reverse
+import pytest
 from rest_framework.test import APIClient
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
 
+@pytest.mark.django_db
 def auth_client():
     user = User.objects.create_user("test", "test@example.com", "pass")
     client = APIClient()
@@ -11,15 +12,10 @@ def auth_client():
     client.credentials(HTTP_AUTHORIZATION="Bearer " + res.data["access"])
     return client
 
+@pytest.mark.django_db
 def test_mock_send_email():
     client = auth_client()
-
-    payload = {
-        "to": "a@b.com",
-        "subject": "Hi",
-        "body": "Test"
-    }
-
+    payload = {"to": "a@b.com", "subject": "Hi", "body": "Test"}
     res = client.post("/emails/mock/send/", payload)
 
     assert res.status_code == 200
