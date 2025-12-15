@@ -1,0 +1,11 @@
+{
+  "name": "Django DevSecOps Environment",
+  // ... other settings (image, features, etc.)
+
+  "postCreateCommand": "npm install -g @google/gemini-cli && echo 'Gemini CLI installed successfully!'",
+  
+  // This command runs once after the Codespace is created.
+  // The CLI is now available on the PATH for the codespace user.
+  
+  // ... other settings
+}
