@@ -40,41 +40,6 @@
 # ================================================================================================
 #                          THE FULL TEAM PROJECT CODE IS ABOVE
 # ================================================================================================
-# version: '3.8'
-# services:
-#   api:
-#     build: ./api
-#     ports:
-#       - "8000:8000"
-#     env_file:
-#       - ./api/.env
-#     volumes:
-#       - ./api:/app
-#     depends_on:
-#       - db
-#       - mailserver
-#       - aiscanner
-
-#   db:
-#     image: postgres:15
-#     restart: always
-#     env_file:
-#       - ./api/.env
-#     ports:
-#       - "5432:5432"
-#     volumes:
-#       - postgres_data:/var/lib/postgresql/data
-
-#   mailserver:
-#     image: alpine
-#     command: ["sh", "-c", "echo 'Mail server mock running' && sleep infinity"]
-
-#   aiscanner:
-#     image: alpine
-#     command: ["sh", "-c", "echo 'AI scanner mock running' && sleep infinity"]
-
-# volumes:
-#   postgres_data:
 
 version: '3.9'
 
@@ -85,9 +50,9 @@ services:
     restart: always
     security_opt:
       - no-new-privileges:true
-    read_only: false       # true if you map a writable folder for DB logs
     cap_drop:
       - ALL
+    read_only: false
     env_file:
       - .env
     volumes:
@@ -111,8 +76,6 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
 
 volumes:
   postgres_data:

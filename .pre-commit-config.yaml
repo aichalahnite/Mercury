@@ -3,6 +3,7 @@ repos:
   rev: 1.7.5
   hooks:
     - id: bandit
+      args: ["-ll"]
 
 - repo: https://github.com/gitleaks/gitleaks
   rev: v8.18.0

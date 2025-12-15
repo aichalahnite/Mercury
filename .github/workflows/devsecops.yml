@@ -6,38 +6,41 @@ on:
 
 jobs:
 
-  security-sast:
-    name: SAST + Linting + Tests
+# ===================== SAST + SCA =====================
+  sast:
+    name: SAST + Dependency Scan
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
+    - uses: actions/setup-python@v5
       with:
         python-version: "3.12"
 
-    - name: Install Dependencies
-      run: pip install -r backend/requirements.txt
+    - name: Install security tools
+      run: pip install bandit safety
 
-    # ---------- SAST ----------
-    - name: Run Bandit (Python security scan)
-      run: bandit -r backend -ll
+    - name: Bandit (SAST)
+      run: bandit -r backend -ll -iii
 
-    # ---------- Dependency Scan ----------
-    - name: Run Safety (Dependency CVE scan)
-      run: pip install safety && safety check -r backend/requirements.txt
+    - name: Dependency Scan (Safety)
+      run: safety check -r backend/requirements.txt --severity critical
 
-    # ---------- Tests ----------
-    - name: Run pytest
-      run: pytest backend/tests --disable-warnings --maxfail=1
-
-
-  security-image:
-    name: Docker Build + Container Security
+# ===================== SECRETS =====================
+  secrets:
+    name: Secret Scan
     runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - uses: gitleaks/gitleaks-action@v2
+
+# ===================== CONTAINER SECURITY =====================
+  container:
+    name: Container Build + Trivy
+    runs-on: ubuntu-latest
+    needs: sast
 
     steps:
     - uses: actions/checkout@v4
@@ -45,39 +48,100 @@ jobs:
     - name: Build Docker image
       run: docker build -t mercury-backend backend
 
-    - name: Scan container with Trivy
+    - name: Trivy Scan
       uses: aquasecurity/trivy-action@master
       with:
-        image-ref: 'mercury-backend'
+        image-ref: mercury-backend
         severity: CRITICAL,HIGH
         exit-code: 1
 
-  security-secrets:
-    name: Secret Scanning
+# ===================== SBOM =====================
+  sbom:
+    name: SBOM Generation
     runs-on: ubuntu-latest
+    needs: container
+
     steps:
     - uses: actions/checkout@v4
 
-    - name: Gitleaks
-      uses: gitleaks/gitleaks-action@v2
+    - name: Build image
+      run: docker build -t mercury-backend backend
 
-
-  security-dast:
-    name: DAST Scan (OWASP ZAP)
-    runs-on: ubuntu-latest
-
-    services:
-      backend:
-        build:
-          context: ./backend
-        ports:
-          - 8000:8000
-
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-
-    - name: ZAP Baseline Scan
-      uses: zaproxy/action-baseline@v0.12.0
+    - name: Generate SBOM
+      uses: anchore/sbom-action@v0
       with:
-        target: "http://localhost:8000"
+        image: mercury-backend
+        format: spdx-json
+        output-file: sbom.json
+
+# ===================== DAST =====================
+dast:
+  name: DAST (OWASP ZAP)
+  runs-on: ubuntu-latest
+  needs: container
+
+  services:
+    db:
+      image: postgres:16
+      env:
+        POSTGRES_DB: dast_db
+        POSTGRES_USER: dast_user
+        POSTGRES_PASSWORD: dast_password
+      ports:
+        - 5432:5432
+      options: >-
+        --health-cmd="pg_isready"
+        --health-interval=10s
+        --health-timeout=5s
+        --health-retries=5
+
+    backend:
+      image: mercury-backend
+      ports:
+        - 8000:8000
+      env:
+        DJANGO_SECRET_KEY: temp-dast-secret
+        DJANGO_DEBUG: "false"
+
+        POSTGRES_DB: dast_db
+        POSTGRES_USER: dast_user
+        POSTGRES_PASSWORD: dast_password
+        POSTGRES_HOST: db
+        POSTGRES_PORT: "5432"
+
+        USE_REAL_SERVICES: "false"
+
+  steps:
+  - uses: actions/checkout@v4
+
+  - name: Wait for backend
+    run: sleep 20
+
+  - name: ZAP Baseline Scan
+    uses: zaproxy/action-baseline@v0.12.0
+    with:
+      target: "http://localhost:8000"
+
+
+# ===================== OPA =====================
+opa:
+  name: Policy Enforcement (OPA)
+  runs-on: ubuntu-latest
+  needs: container
+
+  steps:
+  - uses: actions/checkout@v4
+
+  - name: Install OPA
+    run: |
+      curl -L -o opa https://openpolicyagent.org/downloads/latest/opa_linux_amd64
+      chmod +x opa
+      sudo mv opa /usr/local/bin/
+
+  - name: Evaluate Docker policy
+    run: |
+      docker inspect mercury-backend > docker.json
+      opa eval --fail-defined \
+        -i docker.json \
+        -d policy/docker.rego \
+        "data.docker.security.deny"

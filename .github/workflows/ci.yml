@@ -1,0 +1,28 @@
+name: CI Pipeline
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install dependencies
+      run: |
+        pip install --upgrade pip
+        pip install -r backend/requirements.txt
+        pip install pylint pytest
+
+    - name: Lint (Pylint)
+      run: pylint $(git ls-files '*.py')
+
+    - name: Unit Tests
+      run: pytest backend/tests --maxfail=1 --disable-warnings
