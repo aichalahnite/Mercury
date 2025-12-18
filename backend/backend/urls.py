@@ -10,6 +10,8 @@ from django.contrib.auth import views as auth_views
 
 from users.views import signup
 
+from graphene_django.views import GraphQLView
+from django.views.decorators.csrf import csrf_exempt
 
 schema_view = get_schema_view(
     openapi.Info(title="Mock Backend API", default_version="v1"),
@@ -36,5 +38,6 @@ urlpatterns = [
 
     path('signup/', signup, name='signup'),
 
-]
+    path("graphql/", csrf_exempt(GraphQLView.as_view(graphiql=True))),
 
+]
