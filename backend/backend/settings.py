@@ -55,17 +55,16 @@ MIDDLEWARE = [
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
 
-    # 👉 Insert here
-    'middleware.api_key_gate.ApiKeyGateMiddleware',
-
-    'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
 
     'middleware.security_gateway.SecurityGatewayMiddleware',
+    'middleware.api_key_gate.ApiKeyGateMiddleware',
     'middleware.intelligent_router.IntelligentServiceRouterMiddleware',
     'middleware.response_logger.ResponseLoggingMiddleware',
+
+    'django.middleware.csrf.CsrfViewMiddleware',
+    'django.contrib.messages.middleware.MessageMiddleware',
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
 

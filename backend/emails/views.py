@@ -5,8 +5,10 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from .mock_service import mock_service
 
+from rest_framework.permissions import IsAdminUser
+
 class SendEmailMock(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAdminUser]
 
     def post(self, request):
         data = mock_service.send_email(
@@ -17,7 +19,7 @@ class SendEmailMock(APIView):
         return Response(data)
 
 class ScanEmailMock(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAdminUser]
 
     def post(self, request):
         data = mock_service.scan_email(
