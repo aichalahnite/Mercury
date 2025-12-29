@@ -22,6 +22,7 @@ Security is implemented **by design**, **automated**, and **enforced** at every 
 
 ## High-Level Workflow
 
+```
 Developer
 ├─ Pre-Commit Security Hooks
 ├─ CI Pipeline
@@ -30,9 +31,7 @@ Developer
 ├─ DAST (Live App + Test DB)
 ├─ Secure CD (Vault)
 └─ Production
-
-yaml
-Copy code
+```
 
 ---
 
