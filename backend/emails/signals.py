@@ -5,21 +5,22 @@ from emails.models import Email
 
 
 @receiver(post_save, sender=Email)
-def on_email_created(sender, instance, created, **kwargs):
+def email_post_save(sender, instance, created, **kwargs):
     """
-    Fires when a new email is created (inbox or sent).
+    Fires when an Email is created.
 
-    Subscription publishing has been removed.
-    This signal can later be used for:
-    - logging
-    - audit trails
-    - async tasks
-    - realtime polling support
+    This is a DOMAIN EVENT, not a transport mechanism.
+    No GraphQL subscriptions.
+    No WebSockets.
     """
     if not created:
         return
 
-    # Placeholder for future logic
-    # Example:
-    # logger.info(f"Email created: {instance.id}")
-    pass
+    # ✅ Future-safe hooks (examples):
+    # - auto scan trigger
+    # - audit logging
+    # - metrics
+    # - notifications (later)
+
+    # For now, do nothing
+    return

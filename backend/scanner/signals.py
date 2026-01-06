@@ -5,18 +5,19 @@ from scanner.models import ScanLog
 
 
 @receiver(post_save, sender=ScanLog)
-def on_scan_completed(sender, instance, created, **kwargs):
+def scanlog_post_save(sender, instance, created, **kwargs):
     """
-    Fires when a scan result is stored.
+    Fires when a ScanLog is created.
 
-    Subscription publishing has been removed.
-    This signal can later be used for:
-    - metrics
-    - notifications
-    - background jobs
+    Transport-agnostic domain event.
     """
     if not created:
         return
 
-    # Placeholder for future logic
-    pass
+    # ✅ Future-safe hooks:
+    # - notifications
+    # - risk metrics
+    # - alerting
+    # - async workflows
+
+    return
