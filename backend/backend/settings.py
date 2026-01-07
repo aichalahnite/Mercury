@@ -171,6 +171,9 @@ LOGOUT_REDIRECT_URL = "/login/"
 # =====================
 GRAPHENE = {
     "SCHEMA": "backend.schema.schema",
+    "MIDDLEWARE": [
+        "middleware.graphql_middleware.GraphQLMiddleware",
+    ],
 }
 
 
