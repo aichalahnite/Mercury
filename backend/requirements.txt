@@ -14,3 +14,4 @@ channels
 channels-redis 
 django-cors-headers
 django-graphql-jwt
+python-json-logger

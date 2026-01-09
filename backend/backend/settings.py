@@ -207,19 +207,32 @@ CORS_ALLOW_HEADERS = list(default_headers) + [
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
+
+    "formatters": {
+        "json": {
+            "()": "pythonjsonlogger.jsonlogger.JsonFormatter",
+            "fmt": "%(asctime)s %(levelname)s %(name)s %(message)s",
+        }
+    },
+
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",
+            "formatter": "json",
         }
     },
+
     "root": {
         "handlers": ["console"],
         "level": "INFO",
     },
+
     "loggers": {
         "gateway_logger": {
             "handlers": ["console"],
             "level": "INFO",
+            "propagate": False,
         }
     },
 }
+
