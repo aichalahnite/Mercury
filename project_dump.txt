@@ -122,7 +122,7 @@ channels
 channels-redis 
 django-cors-headers
 django-graphql-jwt
-
+python-json-logger
 $ cat entrypoint.sh
 #!/bin/sh
 
@@ -203,7 +203,6 @@ mock_service.py
 models.py
 schema.py
 signals.py
-signals.py.bak
 tests.py
 urls.py
 views.py
@@ -599,7 +598,6 @@ schema.py
 service_selector.py
 services.py
 signals.py
-signals.py.bak
 tests.py
 urls.py
 views.py
@@ -904,53 +902,21 @@ class ApiKeyGateMiddleware:
 from functools import wraps
 import uuid
 
-from graphql import GraphQLError
-
 from backend.common.models import GraphQLAuditLog
+from backend.common.graphql_errors import (
+    AuthRequiredError,
+    PermissionDeniedError,
+    QueryLimitExceededError,
+)
 
-
-# ==================================================
-# GraphQL Error Definitions (local & explicit)
-# ==================================================
-
-class AuthRequiredError(GraphQLError):
-    def __init__(self):
-        super().__init__(
-            message="Authentication required",
-            extensions={"code": "AUTH_REQUIRED"},
-        )
-
-
-class PermissionDeniedError(GraphQLError):
-    def __init__(self):
-        super().__init__(
-            message="Permission denied",
-            extensions={"code": "PERMISSION_DENIED"},
-        )
-
-
-class QueryLimitExceededError(GraphQLError):
-    def __init__(self, limit):
-        super().__init__(
-            message=f"Query limit exceeded (max {limit} items allowed)",
-            extensions={
-                "code": "QUERY_LIMIT_EXCEEDED",
-                "max_limit": limit,
-            },
-        )
-
-
-# ==================================================
-# GraphQL Middleware
-# ==================================================
 
 class GraphQLMiddleware:
     """
-    Middleware for GraphQL:
+    GraphQL Middleware:
     - Reuses Django trace_id (single source of truth)
-    - Global authentication
-    - Cursor/pagination limit
-    - Stores each query in GraphQLAuditLog
+    - Enforces authentication globally
+    - Enforces pagination limits
+    - Stores every GraphQL operation in GraphQLAuditLog
     """
 
     def __init__(self, query_limit=50):
@@ -969,14 +935,13 @@ class GraphQLMiddleware:
             trace_id = uuid.uuid4().hex
             request.trace_id = trace_id
 
-        # Make trace_id available everywhere in GraphQL
+        # Expose trace_id to resolvers
         info.context.trace_id = trace_id
 
         # --------------------------------------------------
-        # AUTHENTICATION
+        # AUTHENTICATION (GLOBAL)
         # --------------------------------------------------
         user = getattr(request, "user", None)
-
         if not user or not user.is_authenticated:
             raise AuthRequiredError()
 
@@ -984,7 +949,7 @@ class GraphQLMiddleware:
         # QUERY LIMIT (Relay-style `first`)
         # --------------------------------------------------
         first = kwargs.get("first")
-        if first and first > self.query_limit:
+        if first is not None and first > self.query_limit:
             raise QueryLimitExceededError(self.query_limit)
 
         # --------------------------------------------------
@@ -1001,12 +966,12 @@ class GraphQLMiddleware:
 
 
 # ==================================================
-# FIELD-LEVEL DECORATORS
+# FIELD-LEVEL DECORATORS (OPTIONAL OVERRIDES)
 # ==================================================
 
 def admin_required(fn):
     """
-    Ensures user is authenticated and has role='admin'
+    Ensures the user is authenticated and has role='admin'
     """
 
     @wraps(fn)
@@ -1023,7 +988,6 @@ def admin_required(fn):
         return fn(root, info, **kwargs)
 
     return wrapper
-
 import time
 import requests
 import os
@@ -1094,40 +1058,36 @@ class IntelligentServiceRouterMiddleware:
         }
 
         return self.get_response(request)
-import time
 import logging
+import time
+
 logger = logging.getLogger("gateway_logger")
 
-class ResponseLoggingMiddleware:
-    """
-    Logs every request:
-        - user
-        - role
-        - path
-        - duration
-        - trace_id
-        - selected service (from Layer B)
-    """
 
+class ResponseLoggingMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
 
     def __call__(self, request):
         start = time.time()
-
         response = self.get_response(request)
+        duration_ms = round((time.time() - start) * 1000, 2)
 
-        duration = round((time.time() - start) * 1000, 2)
+        user = getattr(request, "user", None)
 
-        logger.info({
-            "trace_id": getattr(request, "trace_id", None),
-            "user": request.user.username if request.user.is_authenticated else "anon",
-            "role": getattr(request.user, "role", None) if request.user.is_authenticated else None,
-            "path": request.path,
-            "services": getattr(request, "service_route", {}),
-            "status": response.status_code,
-            "duration_ms": duration,
-        })
+        logger.info(
+            "request_completed",
+            extra={
+                "trace_id": getattr(request, "trace_id", None),
+                "user": user.username if user and user.is_authenticated else "anon",
+                "role": getattr(user, "role", None) if user else None,
+                "path": request.path,
+                "method": request.method,
+                "status": response.status_code,
+                "services": getattr(request, "service_route", {}),
+                "duration_ms": duration_ms,
+            },
+        )
 
         return response
 from django.http import JsonResponse
@@ -1892,9 +1852,7 @@ $ ls backend
 __init__.py
 asgi.py
 common
-routing.py.bak
 schema.py
-schema.py.bak
 settings.py
 urls.py
 wsgi.py
@@ -2025,6 +1983,7 @@ INSTALLED_APPS = [
     "users",
     "emails.apps.EmailsConfig",
     "scanner.apps.ScannerConfig",
+    "backend.common",
     
     # future additional features
     # "realtime",
@@ -2180,22 +2139,35 @@ CORS_ALLOW_HEADERS = list(default_headers) + [
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
+
+    "formatters": {
+        "json": {
+            "()": "pythonjsonlogger.jsonlogger.JsonFormatter",
+            "fmt": "%(asctime)s %(levelname)s %(name)s %(message)s",
+        }
+    },
+
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",
+            "formatter": "json",
         }
     },
+
     "root": {
         "handlers": ["console"],
         "level": "INFO",
     },
+
     "loggers": {
         "gateway_logger": {
             "handlers": ["console"],
             "level": "INFO",
+            "propagate": False,
         }
     },
 }
+
 from django.contrib import admin
 from django.urls import path, include
 from django.views.decorators.csrf import csrf_exempt
@@ -2275,12 +2247,31 @@ application = get_wsgi_application()
 
 $ ls backend/common
 __init__.py
+admin.py
+apps.py
 audit_logger.py
 graphql_auth.py
 graphql_errors.py
 graphql_permissions.py
+migrations
+models.py
 
 $ cat backend/common/*
+# backend/common/admin.py
+from django.contrib import admin
+from backend.common.models import GraphQLAuditLog
+
+@admin.register(GraphQLAuditLog)
+class GraphQLAuditLogAdmin(admin.ModelAdmin):
+    list_display = ("created_at", "user", "trace_id")
+    search_fields = ("trace_id", "query")
+    ordering = ("-created_at",)
+from django.apps import AppConfig
+
+
+class CommonConfig(AppConfig):
+    name = "backend.common"
+    label = "common"
 # # backend/common/audit_logger.py
 # import logging
 
@@ -2330,18 +2321,24 @@ class QueryLimitExceededError(GraphQLError):
         )
 from functools import wraps
 
+from backend.common.graphql_errors import (
+    AuthRequiredError,
+    PermissionDeniedError,
+)
+
 
 def login_required(fn):
     """
     Ensures the user is authenticated in GraphQL resolvers
     """
+
     @wraps(fn)
     def wrapper(*args, **kwargs):
-        info = args[1]  # (self, info, ...)
-        user = info.context.user
+        info = args[1]  # (root/self, info, ...)
+        user = getattr(info.context, "user", None)
 
         if not user or not user.is_authenticated:
-            raise Exception("Authentication required")
+            raise AuthRequiredError()
 
         return fn(*args, **kwargs)
 
@@ -2350,22 +2347,41 @@ def login_required(fn):
 
 def admin_required(fn):
     """
-    Ensures the user is authenticated AND admin
+    Ensures the user is authenticated AND has role='admin'
     """
+
     @wraps(fn)
     def wrapper(*args, **kwargs):
         info = args[1]
-        user = info.context.user
+        user = getattr(info.context, "user", None)
 
         if not user or not user.is_authenticated:
-            raise Exception("Authentication required")
+            raise AuthRequiredError()
 
         if getattr(user, "role", None) != "admin":
-            raise Exception("Admins only")
+            raise PermissionDeniedError()
 
         return fn(*args, **kwargs)
 
     return wrapper
+from django.conf import settings
+from django.db import models
+
+
+class GraphQLAuditLog(models.Model):
+    trace_id = models.CharField(max_length=64, db_index=True)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
+    query = models.TextField()
+    variables = models.JSONField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"GraphQLAuditLog(trace_id={self.trace_id})"
 
 ==============================
 END OF DUMP
