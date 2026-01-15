@@ -204,6 +204,7 @@ migrations
 mock_service.py
 models.py
 schema.py
+services.py
 signals.py
 tests.py
 urls.py
@@ -350,6 +351,8 @@ class Query(graphene.ObjectType):
 # MUTATIONS
 # =====================
 
+from emails.services import EmailCreationService
+
 class SendEmail(graphene.Mutation):
     class Arguments:
         to = graphene.String(required=True)
@@ -357,23 +360,12 @@ class SendEmail(graphene.Mutation):
         body = graphene.String(required=True)
 
     email = graphene.Field(EmailType)
-    used = graphene.String()
 
     @login_required
     def mutate(self, info, to, subject, body):
         user = info.context.user
-        route = info.context.service_route.get("mailserver", "mock")
 
-        if route == "real":
-            try_real_send_email({
-                "to": to,
-                "subject": subject,
-                "body": body,
-            })
-        else:
-            mock_service.send_email(to, subject, body)
-
-        email = Email.objects.create(
+        email = EmailCreationService.create_and_scan_email(
             user=user,
             sender=user.email,
             recipient=to,
@@ -381,13 +373,71 @@ class SendEmail(graphene.Mutation):
             body=body,
             folder="sent",
             is_outgoing=True,
+            service_route=info.context.service_route,
         )
 
-        return SendEmail(email=email, used=route)
-
+        return SendEmail(email=email)
 
 class Mutation(graphene.ObjectType):
     send_email = SendEmail.Field()
+from django.db import transaction
+from emails.models import Email
+from scanner.models import ScanLog
+from scanner.service_selector import try_real_scan, try_real_send_email
+from emails.mock_service import mock_service
+
+
+class EmailCreationService:
+    @staticmethod
+    @transaction.atomic
+    def create_and_scan_email(
+        *,
+        user,
+        sender,
+        recipient,
+        subject,
+        body,
+        folder,
+        is_outgoing,
+        service_route,
+    ):
+        # 1️⃣ Send email (if outgoing)
+        if is_outgoing:
+            if service_route["mailserver"] == "real":
+                try_real_send_email({
+                    "to": recipient,
+                    "subject": subject,
+                    "body": body,
+                })
+            else:
+                mock_service.send_email(recipient, subject, body)
+
+        # 2️⃣ Create Email
+        email = Email.objects.create(
+            user=user,
+            sender=sender,
+            recipient=recipient,
+            subject=subject,
+            body=body,
+            folder=folder,
+            is_outgoing=is_outgoing,
+        )
+
+        # 3️⃣ Scan (ALWAYS)
+        if service_route["scanner"] == "real":
+            scan = try_real_scan(body)
+        else:
+            scan = mock_service.scan_email(body)
+
+        # 4️⃣ Persist ScanLog (ONE-TO-ONE)
+        ScanLog.objects.create(
+            email=email,
+            user=user,
+            result="malicious" if scan["malicious"] else "safe",
+            confidence=scan["confidence"],
+        )
+
+        return email
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
@@ -418,12 +468,11 @@ from django.test import TestCase
 
 # Create your tests here.
 from django.urls import path
-from .views import SendEmailMock, ScanEmailMock, SendEmailView
+from .views import SendEmailMock
 
 urlpatterns = [
+    #These remain admin-only.
     path("mock/send/", SendEmailMock.as_view()),
-    path("mock/scan/", ScanEmailMock.as_view()),
-    path("send/", SendEmailView.as_view()),
 ]
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -460,53 +509,6 @@ class ScanEmailMock(APIView):
             request.data.get("content", "Test content")
         )
         return Response(data)
-
-
-class SendEmailView(APIView):
-    """
-    Authenticated REST endpoint for sending emails
-    Used by frontend if NOT using GraphQL
-    """
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request):
-        user = request.user
-        to = request.data.get("to")
-        subject = request.data.get("subject")
-        body = request.data.get("body")
-
-        if not to or not subject or not body:
-            return Response(
-                {"error": "to, subject and body are required"},
-                status=400
-            )
-
-        route = getattr(request, "service_route", {}).get("mailserver", "mock")
-
-        if route == "real":
-            try_real_send_email({
-                "to": to,
-                "subject": subject,
-                "body": body,
-            })
-        else:
-            mock_service.send_email(to, subject, body)
-
-        email = Email.objects.create(
-            user=user,
-            sender=user.email,
-            recipient=to,
-            subject=subject,
-            body=body,
-            folder="sent",
-            is_outgoing=True,
-        )
-
-        return Response({
-            "status": "sent",
-            "used": route,
-            "email_id": email.id,
-        })
 
 $ ls users
 __init__.py
@@ -819,12 +821,8 @@ def scanlog_post_save(sender, instance, created, **kwargs):
 from django.test import TestCase
 
 # Create your tests here.
-from django.urls import path
-from .views import ScanView
-
-urlpatterns = [
-    path("scan/", ScanView.as_view(), name="scanner-scan"),
-]
+# scanner/urls.py
+urlpatterns = []
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -834,46 +832,6 @@ from scanner.models import ScanLog
 from scanner.service_selector import try_real_scan
 from emails.mock_service import mock_service
 from scanner.service_selector import try_real_send_email
-
-class ScanView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request):
-        body = request.data.get("body", "")
-        sender = request.data.get("from")
-        subject = request.data.get("subject")
-
-        # 1️⃣ Create email
-        email = Email.objects.create(
-            user=request.user,
-            sender=sender,
-            subject=subject,
-            body=body,
-        )
-
-        # 2️⃣ Scan
-        route = request.service_route.get("scanner", "mock")
-
-        scan = (
-            try_real_scan(body)
-            if route == "real"
-            else mock_service.scan_email(body)
-        )
-
-        # 3️⃣ Save scan result
-        ScanLog.objects.create(
-            email=email,
-            user=request.user,   # ✅ FIX
-            result="malicious" if scan["malicious"] else "safe",
-            confidence=scan["confidence"]
-        )
-
-        return Response({
-            "email_id": email.id,
-            "result": scan["malicious"],
-            "confidence": scan["confidence"],
-            "used": route,
-        })
 
 
 class SendEmailView(APIView):
@@ -2235,7 +2193,6 @@ urlpatterns = [
     # App APIs
     path("users/", include("users.urls")),
     path("emails/", include("emails.urls")),
-    path("scanner/", include("scanner.urls")),
 
     # API Docs
     path("swagger/", schema_view.with_ui("swagger", cache_timeout=0)),
