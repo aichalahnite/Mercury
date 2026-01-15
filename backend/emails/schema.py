@@ -67,6 +67,8 @@ class Query(graphene.ObjectType):
 # MUTATIONS
 # =====================
 
+from emails.services import EmailCreationService
+
 class SendEmail(graphene.Mutation):
     class Arguments:
         to = graphene.String(required=True)
@@ -74,23 +76,12 @@ class SendEmail(graphene.Mutation):
         body = graphene.String(required=True)
 
     email = graphene.Field(EmailType)
-    used = graphene.String()
 
     @login_required
     def mutate(self, info, to, subject, body):
         user = info.context.user
-        route = info.context.service_route.get("mailserver", "mock")
 
-        if route == "real":
-            try_real_send_email({
-                "to": to,
-                "subject": subject,
-                "body": body,
-            })
-        else:
-            mock_service.send_email(to, subject, body)
-
-        email = Email.objects.create(
+        email = EmailCreationService.create_and_scan_email(
             user=user,
             sender=user.email,
             recipient=to,
@@ -98,10 +89,10 @@ class SendEmail(graphene.Mutation):
             body=body,
             folder="sent",
             is_outgoing=True,
+            service_route=info.context.service_route,
         )
 
-        return SendEmail(email=email, used=route)
-
+        return SendEmail(email=email)
 
 class Mutation(graphene.ObjectType):
     send_email = SendEmail.Field()
