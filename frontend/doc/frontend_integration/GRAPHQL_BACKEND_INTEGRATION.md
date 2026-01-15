@@ -1,46 +1,40 @@
 # 📘 Frontend Integration Documentation
 
-**Project:** Mock Email & Scanner Backend
-**Backend Stack:** Django + Graphene (GraphQL) + JWT
-**API Style:** REST + GraphQL (primary)
+## Secure Email & Scanner Backend
+
+**Backend Stack:** Django · GraphQL (Graphene) · JWT
+**API Style:** REST (Authentication) + GraphQL (Business Logic)
 
 ---
 
-## 1️⃣ Backend Overview (for frontend)
+## 1️⃣ Architecture Overview
 
-Your backend exposes:
+The backend exposes **two interfaces**:
 
-| API Type | Purpose                                         |
-| -------- | ----------------------------------------------- |
-| REST     | Authentication, admin, legacy                   |
-| GraphQL  | **Main data access** (emails, scans, mutations) |
+| Interface   | Purpose                        |
+| ----------- | ------------------------------ |
+| **REST**    | Authentication (JWT only)      |
+| **GraphQL** | All application data & actions |
 
-Frontend **should use GraphQL** for:
-
-* Fetching emails
-* Sending emails
-* Fetching scan results
-* Authenticated user data
+📌 **Frontend must use GraphQL for everything except authentication.**
 
 ---
 
-## 2️⃣ API Endpoints
+## 2️⃣ Authentication (REST – JWT)
 
-### 🔐 Authentication (REST – JWT)
+Authentication is handled via REST and is **required before any GraphQL call**.
 
-Frontend **must authenticate first**.
-
-#### Obtain token
+### 🔐 Obtain Access Token
 
 ```
 POST /auth/token/
 ```
 
-**Payload**
+**Request Body**
 
 ```json
 {
-  "email": "user@example.com",
+  "username": "user",
   "password": "password"
 }
 ```
@@ -56,158 +50,193 @@ POST /auth/token/
 
 ---
 
-#### Refresh token
+### 🔄 Refresh Token
 
 ```
 POST /auth/token/refresh/
 ```
 
+**Request Body**
+
+```json
+{
+  "refresh": "JWT_REFRESH_TOKEN"
+}
+```
+
 ---
 
-### 🧠 GraphQL Endpoint
+## 3️⃣ GraphQL Endpoint
 
 ```
 POST /graphql/
 ```
 
-or (dev only)
+Development only:
 
 ```
-GET /graphql/  (GraphiQL enabled)
+GET /graphql/   (GraphiQL UI)
 ```
 
 ---
 
-## 3️⃣ Authentication for GraphQL
+## 4️⃣ Authentication for GraphQL
 
-Frontend **must send JWT** in headers:
+All GraphQL requests **must include**:
 
 ```
 Authorization: Bearer <ACCESS_TOKEN>
 ```
 
-⚠️ If missing → `Authentication required`
+❌ Missing token → `Authentication required`
 
 ---
 
-## 4️⃣ GraphQL Schema Access
+## 5️⃣ Core Backend Guarantee (VERY IMPORTANT)
 
-GraphQL is **self-documented**.
+> 🔐 **Every email created or returned by GraphQL is scanned automatically.**
 
-Frontend can explore:
+This means:
 
-* GraphiQL UI at `/graphql/`
-* Introspection via Apollo / Relay
+* Frontend **never triggers scanning**
+* Frontend **never waits for scan**
+* Scan results are **always present**
+
+There is **no email without a scan result**.
 
 ---
 
-## 5️⃣ GraphQL Queries (READ)
+## 6️⃣ Core Concepts (Frontend View)
+
+### 📧 Email
+
+A message entity stored in the backend.
+
+### 🧪 Scan
+
+A security verdict attached to each email.
+
+### 📂 Folder
+
+| Value   | Meaning         |
+| ------- | --------------- |
+| `inbox` | Received emails |
+| `sent`  | Sent emails     |
 
 ---
+
+## 7️⃣ GraphQL Queries (READ)
 
 ### 📩 Get My Emails
 
 ```graphql
-query MyEmails {
-  myEmails(folder: "inbox", limit: 20, offset: 0) {
+query MyEmails($folder: String!, $limit: Int!, $offset: Int!) {
+  myEmails(folder: $folder, limit: $limit, offset: $offset) {
     id
     sender
     recipient
     subject
     body
-    folder
     createdAt
-  }
-}
-```
-
-📌 Folders:
-
-* `inbox`
-* `sent`
-
----
-
-### 🧪 Get My Scan Logs
-
-```graphql
-query MyScanLogs {
-  myScanLogs(limit: 20, offset: 0) {
-    id
-    result
-    confidence
-    createdAt
-    email {
-      subject
-    }
-  }
-}
-```
-
----
-
-### 🔐 Admin Only: All Scan Logs
-
-```graphql
-query AllScanLogs {
-  scanLogs(result: "clean") {
-    id
-    result
-    confidence
-    createdAt
-  }
-}
-```
-
-❌ Non-admin → error
-
----
-
-## 6️⃣ GraphQL Mutations (WRITE)
-
----
-
-### ✉️ Send Email
-
-```graphql
-mutation SendEmail {
-  sendEmail(
-    to: "test@example.com"
-    subject: "Hello"
-    body: "This is a test"
-  ) {
-    used
-    email {
-      id
-      subject
-      recipient
+    scan {
+      result
+      confidence
       createdAt
     }
   }
 }
 ```
 
-**`used` value**
+**Variables**
 
-* `"mock"` → mock service
-* `"real"` → real mail server
+```json
+{
+  "folder": "inbox",
+  "limit": 20,
+  "offset": 0
+}
+```
+
+📌 `folder` values:
+
+* `inbox`
+* `sent`
 
 ---
 
-## 7️⃣ Authorization Rules
+## 8️⃣ GraphQL Mutations (WRITE)
 
-| Action        | Requirement    |
-| ------------- | -------------- |
-| Read emails   | Authenticated  |
-| Send email    | Authenticated  |
-| Scan logs     | Authenticated  |
-| All scan logs | **Admin only** |
+### ✉️ Send Email
+
+```graphql
+mutation SendEmail($to: String!, $subject: String!, $body: String!) {
+  sendEmail(to: $to, subject: $subject, body: $body) {
+    email {
+      id
+      sender
+      recipient
+      subject
+      body
+      createdAt
+      scan {
+        result
+        confidence
+      }
+    }
+  }
+}
+```
+
+**Variables**
+
+```json
+{
+  "to": "test@example.com",
+  "subject": "Hello",
+  "body": "This is a test email"
+}
+```
+
+### ✅ Backend guarantees on success:
+
+* Email is stored
+* Email is scanned
+* Scan result is stored
+* Email + scan are returned together
 
 ---
 
-## 8️⃣ Errors Frontend Should Handle
+## 9️⃣ Scan Result Values
 
-### Authentication error
+### `scan.result`
+
+| Value       | Meaning                   |
+| ----------- | ------------------------- |
+| `safe`      | No threat detected        |
+| `malicious` | Potential threat detected |
+
+### `scan.confidence`
+
+* Float between `0.0` and `1.0`
+* Higher means higher confidence
+
+---
+
+## 🔟 Authorization Rules
+
+| Action            | Requirement        |
+| ----------------- | ------------------ |
+| Read emails       | Authenticated user |
+| Send email        | Authenticated user |
+| Admin scan access | Admin only         |
+
+Frontend does **not** need to check roles unless UI requires it.
+
+---
+
+## 1️⃣1️⃣ Error Handling
+
+### 🔐 Authentication Error
 
 ```json
 {
@@ -217,79 +246,79 @@ mutation SendEmail {
 }
 ```
 
+➡ Redirect to login
+
 ---
 
-### Permission error
+### ⛔ Permission Error
 
 ```json
 {
   "errors": [
-    { "message": "Admins only" }
+    { "message": "Permission denied" }
   ]
 }
 ```
 
+➡ Show access denied
+
 ---
 
-### Query limit exceeded
+### 📉 Pagination Error
 
 ```json
 {
   "errors": [
-    { "message": "Query limit exceeded: max 50 items allowed" }
+    { "message": "Query limit exceeded" }
   ]
 }
 ```
 
+➡ Reduce `limit`
+
 ---
 
-## 9️⃣ Pagination Rules
+## 1️⃣2️⃣ Pagination Rules
 
 GraphQL uses:
 
 * `limit`
 * `offset`
 
-Frontend **must paginate**, max:
+📌 Constraints:
 
 ```
 limit ≤ 50
 ```
 
----
-
-## 🔍 Observability (for debugging)
-
-Every request has:
-
-* `trace_id`
-* Shared between REST + GraphQL
-* Appears in logs & audit tables
-
-Frontend **does not need to send trace_id**
-Backend generates it automatically.
+Frontend **must paginate**.
 
 ---
 
-## 1️⃣0️⃣ CORS & Frontend Hosting
+## 1️⃣3️⃣ What Frontend MUST NOT Do
 
-Backend supports:
+❌ Call scanner REST endpoints
+❌ Call email mock endpoints
+❌ Send unscanned emails
+❌ Bypass GraphQL
 
-* Browser-based GraphQL
-* Token auth
-* SPA integration (React / Vue / Next)
-
-Frontend just needs:
-
-```
-Authorization header
-```
+All business logic lives in GraphQL.
 
 ---
 
-## 1️⃣1️⃣ Recommended Frontend Stack
+## 1️⃣4️⃣ Observability & Debugging
 
-Works perfectly with:
+* Backend generates `trace_id`
+* Shared across REST & GraphQL
+* Appears in logs and audit tables
+
+Frontend **does not send or manage** `trace_id`.
+
+---
+
+## 1️⃣5️⃣ Compatible Frontend Stacks
+
+Fully compatible with:
 
 * Apollo Client
 * Relay
@@ -298,19 +327,27 @@ Works perfectly with:
 
 ---
 
-## 1️⃣2️⃣ Summary for Frontend Dev 👇
+## 1️⃣6️⃣ TL;DR for Frontend Developer
 
-> ✅ Use `/auth/token/` to login
+✅ Login via `/auth/token/`
+✅ Store JWT access token
+✅ Call `/graphql/` with Authorization header
+✅ Use `myEmails` to read
+✅ Use `sendEmail` to write
+✅ Always display scan results
 
-> ✅ Store JWT access token
+❌ Never call scanner or mock endpoints
 
-> ✅ Call `/graphql/` with Authorization header
+---
 
-> ✅ Use queries/mutations above
+## ✅ Final Note
 
-> ✅ Paginate results
+This contract is **stable and future-proof**.
+Backend may later add:
 
-> ❌ Do not call DB directly
+* real mail delivery
+* async processing
+* subscriptions
 
-> ❌ Do not bypass GraphQL
+Frontend **will not need changes**.
 
