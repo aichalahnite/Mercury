@@ -1,4 +1,4 @@
-# Intelligent Mail Server
+# Mercury - Intelligent Mail Server
 
 An **Intelligent Mail Server** is a secure, modular email platform that combines a modern web interface, a robust backend, and a Machine Learning–based scanner to enhance email security (spam/phishing/malware detection) while maintaining scalability and clean architecture.
 
@@ -52,6 +52,8 @@ The system is built using a **microservice-oriented approach**, separating conce
 ## 3. System Architecture
 
 The system follows a **clean, layered architecture** with strict separation of concerns and **GraphQL-only communication** between frontend and backend.
+
+![Diagram cas d'utilisation](https://github.com/user-attachments/assets/bdfa544b-9476-4d36-ae1e-8e6ab8859a1e)
 
 ### Frontend (Web Client)
 
@@ -128,7 +130,8 @@ pnpm run dev
 5. Frontend stores tokens securely
 6. All future GraphQL requests are authenticated
 
-📌 **Diagram provided:** Use Case + Sequence Diagram (Authentication)
+📌 **Diagram provided:** 
+<img width="959" height="1372" alt="Diagram sequence d'authentification" src="https://github.com/user-attachments/assets/350dabfb-06bb-46ba-bdb5-b838e53d6114" />
 
 ### Sending an Email
 
@@ -143,9 +146,7 @@ pnpm run dev
 7. Email appears in the **Sent** folder
 
 📌 **Diagrams provided:**
-- Use Case Diagram (Send Email)
-- Sequence Diagram (Send Email)
-- Class Diagram (Email + ScanLog)
+<img width="1418" height="1226" alt="Diagram de sequence envoi email" src="https://github.com/user-attachments/assets/7f11e46a-7f0d-4428-a402-068a2de07c72" />
 
 ### Receiving an Email
 
@@ -158,8 +159,7 @@ pnpm run dev
 7. Email becomes visible in Inbox
 
 📌 **Diagrams provided:**
-- Use Case Diagram (Receive Email)
-- Sequence Diagram (Receive Email)
+<img width="1582" height="1237" alt="Diagram de sequence recoit email" src="https://github.com/user-attachments/assets/0f0b307d-373a-47bf-a4bf-59b51060b0c8" />
 
 ---
 
@@ -214,7 +214,8 @@ The ML Scanner is a **mandatory security component**, implemented as an independ
 - Easy model replacement or retraining
 - Independent scalability
 
-📌 **Diagram provided:** Class Diagram (Scanner, ScanLog, Email)
+📌 **Diagram provided:** 
+<img width="892" height="956" alt="Diagram de classe" src="https://github.com/user-attachments/assets/2c3e269f-c3ad-4f02-9f4d-aa5c05b7780c" />
 
 ---
 
@@ -229,8 +230,8 @@ The ML Scanner is a **mandatory security component**, implemented as an independ
 ### Clone the Repository
 
 ```bash
-git clone <repository-url>
-cd intelligent-mail-server
+git clone https://github.com/ranaitsan123/Mercury.git
+cd Mercury
 ```
 
 ### Frontend Setup (Local)
