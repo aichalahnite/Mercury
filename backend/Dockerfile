@@ -1,17 +1,20 @@
-FROM python:3.12-slim
+# Base Python image
+FROM python:3.11-slim
 
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
-
+# Set working directory
 WORKDIR /app
 
-# Install netcat
-RUN apt-get update && apt-get install -y netcat-openbsd && rm -rf /var/lib/apt/lists/*
+# Copy only requirements first (for caching)
+COPY backend/requirements.txt .
 
-COPY requirements.txt .
+# Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+# Copy the whole backend folder
+COPY backend/ .
 
-CMD ["/entrypoint.sh"]
+# Expose the port your app will run on
+EXPOSE 8000
+
+# Run migrations and start the server
+CMD ["sh", "-c", "python manage.py migrate && gunicorn config.wsgi:application --bind 0.0.0.0:8000"]
