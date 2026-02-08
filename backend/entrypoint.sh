@@ -1,10 +1,10 @@
 #!/bin/sh
-
 set -e
 
 echo "⏳ Waiting for PostgreSQL to be ready..."
 
-while ! nc -z db 5432; do
+# Railway-safe DB wait
+while ! nc -z "$DB_HOST" "$DB_PORT"; do
   sleep 1
 done
 
@@ -12,6 +12,9 @@ echo "✅ PostgreSQL is available!"
 
 echo "📦 Applying migrations..."
 python manage.py migrate --noinput
+
+echo "🎨 Collecting static files..."
+python manage.py collectstatic --noinput || true
 
 echo "👑 Creating superuser if not exists..."
 
@@ -39,6 +42,8 @@ else:
     print("⚠️ Superuser env vars not set, skipping")
 EOF
 
-
-echo "🚀 Starting Django server..."
-exec python manage.py runserver 0.0.0.0:8000
+echo "🚀 Starting Gunicorn..."
+exec gunicorn config.wsgi:application \
+  --bind 0.0.0.0:8000 \
+  --workers 3 \
+  --timeout 120
