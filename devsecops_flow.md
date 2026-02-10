@@ -1,3 +1,4 @@
+```
 graph LR
     A["🖥️ Developer<br/>(Local Machine)"] -->|"write code"| B["📝 Code<br/>(Backend Files)"]
     
@@ -40,3 +41,5 @@ graph LR
     style G fill:#87CEEB
     style K fill:#FFB6C1
     style P fill:#FFD700
+```
+<img width="8191" height="1597" alt="Image" src="https://github.com/user-attachments/assets/40dbbe99-7381-4291-b1ef-5208f47f2a09" />
