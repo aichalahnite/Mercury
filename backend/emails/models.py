@@ -1,15 +1,29 @@
+from django.conf import settings
 from django.db import models
 
-class ScanLog(models.Model):
-    sender = models.CharField(max_length=255, null=True, blank=True)
-    subject = models.CharField(max_length=255, null=True, blank=True)
-    body = models.TextField(null=True, blank=True)
+class Email(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="emails"
+    )
 
-    result = models.CharField(max_length=50)  # "safe" / "malicious"
-    confidence = models.FloatField(default=0.0)
+    sender = models.EmailField()
+    recipient = models.EmailField(null=True, blank=True)
 
-    scanned_at = models.DateTimeField(auto_now_add=True)
+    subject = models.CharField(max_length=255)
+    body = models.TextField()
+
+    # Inbox logic
+    folder = models.CharField(
+        max_length=20,
+        choices=[("inbox", "Inbox"), ("sent", "Sent")],
+        default="inbox"
+    )
+
+    is_outgoing = models.BooleanField(default=False)
+
+    created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.sender} - {self.subject} ({self.result})"
-
+        return f"Email from {self.sender} to {self.recipient} - {self.subject}"

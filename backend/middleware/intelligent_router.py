@@ -34,10 +34,15 @@ class IntelligentServiceRouterMiddleware:
         self.last_checked[kind] = now
 
         try:
-            requests.get(url, timeout=1)
-            self.service_status[kind] = True
+            # Prefer HEAD request
+            requests.head(url, timeout=1, allow_redirects=True)
         except Exception:
-            self.service_status[kind] = False
+            # Fallback to GET if HEAD fails
+            try:
+                requests.get(url, timeout=1)
+            except Exception:
+                self.service_status[kind] = False
+                return False
 
         return self.service_status[kind]
 

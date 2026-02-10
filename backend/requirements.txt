@@ -8,3 +8,10 @@ pytest
 pytest-django
 pytest-cov
 requests-mock
+graphene-django
+django-filter
+channels 
+channels-redis 
+django-cors-headers
+django-graphql-jwt
+python-json-logger
