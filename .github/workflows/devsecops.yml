@@ -25,7 +25,7 @@ jobs:
         run: bandit -r backend -ll -iii
 
       - name: Dependency Scan (Safety)
-        run: safety check -r backend/requirements.txt --severity critical
+        run: safety check -r backend/requirements.txt
 
 # ===================== SECRETS =====================
   secrets:
