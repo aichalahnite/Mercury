@@ -1,0 +1,22 @@
+[
+ {
+  "Description": "GCP API key",
+  "StartLine": 19,
+  "EndLine": 19,
+  "StartColumn": 17,
+  "EndColumn": 0,
+  "Match": "AIzaSyDDBqXC7Gdo0ZM3Fvf0U_jPUma6Y4Ru3po",
+  "Secret": "AIzaSyDDBqXC7Gdo0ZM3Fvf0U_jPUma6Y4Ru3po",
+  "File": ".env",
+  "SymlinkFile": "",
+  "Commit": "b1dafcd09a6f83a6fc5cf34274ff8a7f93d74be0",
+  "Entropy": 4.97771,
+  "Author": "aichalahnite",
+  "Email": "159141036+aichalahnite@users.noreply.github.com",
+  "Date": "2025-12-29T15:53:12Z",
+  "Message": "Merge branch 'backend' of https://github.com/aichalahnite/Mercury into backend\n\ncommit 66761a1c57e9ec73a658c832957a4f0c409599c4\nAuthor: aichalahnite \u003c159141036+aichalahnite@users.noreply.github.com\u003e\nDate:   Mon Dec 29 15:48:38 2025 +0000\n\nAjout de la clé API Gemini, création de la documentation DevSecOps, et mise à jour des fichiers de configuration pour la sécurité et l'authentification.",
+  "Tags": [],
+  "RuleID": "gcp-api-key",
+  "Fingerprint": "b1dafcd09a6f83a6fc5cf34274ff8a7f93d74be0:.env:gcp-api-key:19"
+ }
+]
